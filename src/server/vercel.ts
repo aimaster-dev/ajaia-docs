@@ -1,5 +1,6 @@
-// Vercel entry point. The API runs as one serverless function (api/index.js
-// loads this module); Vercel serves the built React app itself from dist/client.
+// Vercel entry point. The API runs as one serverless function: this module is
+// bundled by scripts/build-vercel.mjs and loaded by api/index.js. Vercel serves
+// the built React app itself from dist/client.
 import type { Express } from 'express';
 import { createApp } from './app.js';
 import { config } from './config.js';

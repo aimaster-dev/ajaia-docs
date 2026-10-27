@@ -35,6 +35,7 @@ Verification caught several problems in the generated code:
 | Dropping an audio file and a video together lost the video's spot: inserting the player split the paragraph, and the editor discarded the placeholder sitting on the split | Browser test of a multi-file drop | Placeholder positions are tracked and mapped by hand, and files in one drop are placed one after another |
 | Clicking *Insert* in the Attachments box replaced whatever was selected, deleting an image that happened to be selected | Browser test (the image vanished) | Inserting always goes after the selection and never replaces it |
 | A combined rename + content save could half-apply if the content save hit a conflict | Review | The title and content are saved by one version-checked statement |
+| The first Vercel deploy built, but the API crashed on start: `sanitize-html` `require()`s `htmlparser2`, which ships only ES modules. Node 22.12+ allows that, so every local test passed, but Vercel's runtime refuses it | Vercel's function logs | Reproduced locally by running Node with that feature off (`--no-experimental-require-module`). The API is now bundled for Vercel with esbuild, which resolves those imports at build time. Downgrading `sanitize-html` was rejected: every release after 2.17.1 has the same dependency |
 | Moving to an async database made the 20-file limit racy: the count was checked, then the file inserted, and two uploads could both pass the check | Review during the libSQL conversion | The count is checked inside the insert itself, with a test racing three uploads for the last slot |
 | Clicking a page's margin didn't put the cursor in the document | Browser testing | Margin clicks focus the editor |
 | One 656 KB JS bundle | Build output | The editor is lazy-loaded; the first page is now 75 KB gzipped |
@@ -81,7 +82,7 @@ Approaches considered and rejected:
   - background tabs pause `requestAnimationFrame`, so focus changes are delayed
 
   These were confirmed by inspecting the DOM directly before deciding whether to change code.
-- **The Vercel function, run locally.** The built `api/index.js` was run behind a plain Node HTTP server against a throwaway database: 19 checks, including the "database not configured" message, sign-in, a combined rename + save, a stale save, uploads and byte-exact downloads up to 3.98 MB, a refused 4 MB+ file and a `.docx` import with its picture. A copy of the real local database was also opened with the new driver to confirm nothing was lost.
+- **The Vercel function, run locally.** The built `api/index.js` was run behind a plain Node HTTP server against a throwaway database, with Node's `require()` of ES modules turned off to match Vercel's runtime: 19 checks, including the "database not configured" message, sign-in, a combined rename + save, a stale save, uploads and byte-exact downloads up to 3.98 MB, a refused 4 MB+ file and a `.docx` import with its picture. A copy of the real local database was also opened with the new driver to confirm nothing was lost.
 - **Not verified locally:**
   - the Turso connection itself (HTTPS rather than a local file; same queries), and Vercel's build and routing. The first deploy checks both.
   - the Docker image build (no Docker on the build machine).

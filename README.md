@@ -104,6 +104,7 @@ Other scripts:
 | `npm test` | Runs the test suite (Vitest) |
 | `npm run typecheck` | Type-checks the server, client and tests |
 | `npm run build` | Builds the client into `dist/client` and the server into `dist/server` |
+| `npm run build:vercel` | `build`, plus the API bundled into one file for Vercel (`dist/vercel/server.mjs`) |
 | `npm start` | Runs the production build (`node dist/server/index.js`) |
 | `npm run samples` | Regenerates the test files in `samples/` (including the large ones, which aren't committed) |
 
@@ -129,14 +130,15 @@ Vercel runs the API as a serverless function and serves the React app from its C
 The app creates its tables, demo accounts and sample documents on first start.
 
 **2. Deploy** (Vercel, free Hobby plan):
-1. In Vercel, choose **Add New → Project** and import this GitHub repository. `vercel.json` already sets the build (`npm run build`), the output folder (`dist/client`) and the routes, so leave the build settings as they are.
+1. In Vercel, choose **Add New → Project** and import this GitHub repository. `vercel.json` already sets the build (`npm run build:vercel`), the output folder (`dist/client`) and the routes, so leave the build settings as they are.
 2. Under **Environment Variables**, add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` with the values from step 1.
 3. Click **Deploy**. When it finishes, open the `*.vercel.app` URL and sign in as a demo account, or create one.
 
 If you deployed before adding the variables, add them under **Settings → Environment Variables** and redeploy. Until then the API answers with a message saying what's missing.
 
 How it fits together:
-- `api/index.js` is the one serverless function. It loads the compiled Express app (`dist/server/vercel.js`) once per instance and passes each `/api/*` request to it.
+- `api/index.js` is the one serverless function. It loads the Express app once per instance and passes each `/api/*` request to it.
+- The app is bundled into one file, `dist/vercel/server.mjs`, by `scripts/build-vercel.mjs` (esbuild). Vercel's Node runtime can't `require()` packages that ship only ES modules, which Node itself allows and which `sanitize-html` relies on. Bundling resolves those imports at build time.
 - `vercel.json` sends `/api/*` to that function, every other path to the React app, and sets the same security headers the Express server sets.
 - **Files are limited to 4 MB**, because a Vercel function accepts at most 4.5 MB per request and response.
 
@@ -217,7 +219,7 @@ src/
     components/    Toolbar, AttachmentsPanel, ShareDialog, AccountDialog, form fields, header, toasts
     lib/           API client, autosave, form validation, tiny router
   shared/          types, account rules and attachment rules shared by client and server
-api/index.js       the Vercel serverless function (loads dist/server/vercel.js)
+api/index.js       the Vercel serverless function (loads the bundle made by scripts/build-vercel.mjs)
 tests/             embedding, attachment, account, database, API and autosave tests
 samples/           test files: import/, attach/, should-fail/ (guide in samples/README.md)
 docs/              architecture and AI workflow notes

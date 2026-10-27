@@ -1,13 +1,14 @@
 // Vercel runs this file as a serverless function for every /api/* request
-// (vercel.json sends them here). It starts the compiled Express app once per
-// instance (built to dist/server by `npm run build`) and hands it each request.
+// (vercel.json sends them here). It starts the Express app once per instance
+// and hands it each request. The app is bundled into one file by
+// `npm run build:vercel` (see scripts/build-vercel.mjs for why).
 // Plain JavaScript on purpose, so Vercel doesn't compile any TypeScript itself.
 
 let app;
 
 export default async function handler(req, res) {
   try {
-    app ??= import('../dist/server/vercel.js').then((m) => m.createVercelApp());
+    app ??= import('../dist/vercel/server.mjs').then((m) => m.createVercelApp());
     const express = await app;
     express(req, res);
   } catch (err) {

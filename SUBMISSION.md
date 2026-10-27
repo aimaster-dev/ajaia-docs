@@ -25,7 +25,7 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | AI workflow note | [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md) |
 | Screenshots | [`docs/screenshots/`](docs/screenshots/) (6 PNGs, also shown below) |
 | Test files for manual testing | [`samples/`](samples/README.md): `import/` (5), `attach/` (11), `should-fail/` (10 committed, plus 2 large ones made by `npm run samples`) |
-| Deployment config | `vercel.json` and `api/index.js` (Vercel: static client plus one serverless function; data in Turso). Also a `Dockerfile` for any Docker host, with `render.yaml` and `railway.json` |
+| Deployment config | `vercel.json`, `api/index.js` and `scripts/build-vercel.mjs` (Vercel: static client plus one bundled serverless function; data in Turso). Also a `Dockerfile` for any Docker host, with `render.yaml` and `railway.json` |
 | Project config | `package.json`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts`, `vitest.config.ts`, `index.html`, `public/favicon.svg`, `.gitignore` |
 | Sample generator | `scripts/make-samples.ts` (`npm run samples`) |
 
