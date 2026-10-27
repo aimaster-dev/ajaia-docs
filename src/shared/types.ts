@@ -77,7 +77,7 @@ export interface ConflictDetails {
 }
 
 export const IMPORT_EXTENSIONS = ['.txt', '.md', '.markdown', '.docx'] as const;
-export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+export const MAX_IMPORT_BYTES = 4 * 1024 * 1024;
 export const MAX_TITLE_LENGTH = 200;
 export const MAX_CONTENT_BYTES = 1024 * 1024;
 

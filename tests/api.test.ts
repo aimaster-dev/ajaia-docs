@@ -4,7 +4,7 @@ import type { Express } from 'express';
 import { createApp } from '../src/server/app.js';
 import { Store } from '../src/server/db.js';
 import { DEMO_PASSWORD, seedDemoAccounts } from '../src/server/seed.js';
-import type { DocumentDetail, DocumentListResponse } from '../src/shared/types.js';
+import { MAX_IMPORT_BYTES, type DocumentDetail, type DocumentListResponse } from '../src/shared/types.js';
 import { makeDocx } from './helpers/docx.js';
 
 const ALICE = 'alice';
@@ -15,7 +15,7 @@ let app: Express;
 
 beforeEach(async () => {
   // A fresh in-memory database per test keeps tests independent.
-  const store = new Store(':memory:');
+  const store = await Store.open({ url: ':memory:' });
   await seedDemoAccounts(store);
   app = createApp(store);
 });
@@ -204,7 +204,7 @@ describe('file import', () => {
     await alice.post('/api/documents/import').attach('file', Buffer.from('not a zip'), 'bad.docx').expect(422);
     await alice
       .post('/api/documents/import')
-      .attach('file', Buffer.alloc(6 * 1024 * 1024, 'a'), 'huge.txt')
+      .attach('file', Buffer.alloc(MAX_IMPORT_BYTES + 1, 'a'), 'huge.txt')
       .expect(413);
     await alice.post('/api/documents/import').expect(400);
   });

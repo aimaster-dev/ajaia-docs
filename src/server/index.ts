@@ -3,7 +3,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { createApp } from './app.js';
-import { config } from './config.js';
+import { config, describeDatabase } from './config.js';
 import { Store } from './db.js';
 import { seedDemoAccounts } from './seed.js';
 
@@ -13,7 +13,8 @@ if (!existsSync(join(clientDir, 'index.html'))) {
   process.exit(1);
 }
 
-const store = new Store(config.databasePath);
+const database = config.database;
+const store = await Store.open(database);
 if (config.demoAccounts) await seedDemoAccounts(store);
 
 const app = createApp(store, {
@@ -31,7 +32,7 @@ const app = createApp(store, {
 });
 
 const server = app.listen(config.port, () => {
-  console.log(`Ajaia Docs listening on http://localhost:${config.port} (db: ${config.databasePath})`);
+  console.log(`Ajaia Docs listening on http://localhost:${config.port} (db: ${describeDatabase(database)})`);
 });
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {

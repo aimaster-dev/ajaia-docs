@@ -15,6 +15,7 @@ import { Avatar } from '../components/Avatar';
 import { useToast } from '../components/Toasts';
 
 const ACCEPT = IMPORT_EXTENSIONS.join(',');
+const IMPORT_LIMIT_MB = MAX_IMPORT_BYTES / (1024 * 1024);
 
 /** Fast client-side check so obvious mistakes don't need a round trip. The server re-validates. */
 function validateFile(file: File): string | null {
@@ -22,7 +23,7 @@ function validateFile(file: File): string | null {
   if (!(IMPORT_EXTENSIONS as readonly string[]).includes(ext)) {
     return `“${file.name}” isn't supported. Import a .txt, .md or .docx file.`;
   }
-  if (file.size > MAX_IMPORT_BYTES) return `“${file.name}” is larger than the 5 MB limit.`;
+  if (file.size > MAX_IMPORT_BYTES) return `“${file.name}” is larger than the ${IMPORT_LIMIT_MB} MB limit.`;
   if (file.size === 0) return `“${file.name}” is empty.`;
   return null;
 }
@@ -127,7 +128,7 @@ export function DocumentsPage({ user, onSignOut }: { user: User; onSignOut: () =
             }}
           />
           <p className="muted import-hint">
-            Import a <strong>.txt</strong>, <strong>.md</strong> or <strong>.docx</strong> file (up to 5 MB) as a new
+            Import a <strong>.txt</strong>, <strong>.md</strong> or <strong>.docx</strong> file (up to {IMPORT_LIMIT_MB} MB) as a new
             editable document, or drop it anywhere on this page.
           </p>
         </section>

@@ -7,7 +7,7 @@ export type EmbedStyle = 'image' | 'audio' | 'chip';
 
 /**
  * Images and audio play inline. Video is a downloadable chip for now: at the
- * 10 MB limit a video is only a minute or so, and large media belongs in
+ * 4 MB limit a video is only a few seconds long, and large media belongs in
  * object storage rather than the database.
  */
 export function embedStyleOf(kind: AttachmentKind): EmbedStyle {
@@ -79,7 +79,8 @@ export const INLINE_MIME_TYPES: ReadonlySet<string> = new Set([
 export function attachmentPath(documentId: string, attachmentId: string, inline = false): string {
   return `/api/documents/${documentId}/attachments/${attachmentId}${inline ? '?inline=1' : ''}`;
 }
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+// 4 MB keeps an upload (or download) under the 4.5 MB request limit of serverless hosts like Vercel.
+export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_DOCUMENT = 20;
 export const MAX_FILENAME_LENGTH = 200;
 

@@ -1,6 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import { createHash } from 'node:crypto';
-import type { Store } from './db.js';
+import { createHash, randomUUID } from 'node:crypto';
+import type { NewAttachment, Store } from './db.js';
 import { HttpError, forbidden, notFound } from './errors.js';
 import { RateLimiter } from './rateLimit.js';
 import { cleanFilename, contentMatchesExtension, originalName, singleFileUpload } from './uploads.js';
@@ -71,15 +71,23 @@ export function checkAttachmentFile(filename: string, data: Uint8Array): string 
   return type.mime;
 }
 
-export function saveAttachment(store: Store, documentId: string, userId: string, filename: string, mimeType: string, data: Buffer) {
-  return store.createAttachment({
+/** A checked file, ready to save with Store.createAttachment. */
+export function newAttachment(
+  documentId: string,
+  userId: string,
+  filename: string,
+  mimeType: string,
+  data: Uint8Array,
+): NewAttachment & { id: string } {
+  return {
+    id: randomUUID(),
     documentId,
     uploadedBy: userId,
     filename,
     mimeType,
     sha256: createHash('sha256').update(data).digest('hex'),
     data,
-  });
+  };
 }
 
 /**
@@ -91,22 +99,22 @@ export function attachmentsRouter(store: Store) {
   const router = Router({ mergeParams: true });
   const limiter = new RateLimiter();
 
-  const load = (req: Request): DocumentDetail => {
-    const doc = store.getDocument(String(req.params.id), req.user!.id);
+  const load = async (req: Request): Promise<DocumentDetail> => {
+    const doc = await store.getDocument(String(req.params.id), req.user!.id);
     if (!doc) throw notFound();
     return doc;
   };
 
-  /** Checks permission before the upload body is read, so a viewer's 10 MB isn't buffered for nothing. */
-  const requireEditor = (req: Request, _res: Response, next: NextFunction) => {
-    const doc = load(req);
+  /** Checks permission before the upload body is read, so a viewer's upload isn't buffered for nothing. */
+  const requireEditor = async (req: Request, _res: Response, next: NextFunction) => {
+    const doc = await load(req);
     if (doc.role === 'viewer') throw forbidden('You have view-only access, so you can’t change attachments.');
     next();
   };
 
-  router.get('/', (req, res) => {
-    const doc = load(req);
-    res.json({ attachments: store.listAttachments(doc.id) });
+  router.get('/', async (req, res) => {
+    const doc = await load(req);
+    res.json({ attachments: await store.listAttachments(doc.id) });
   });
 
   router.post(
@@ -117,27 +125,30 @@ export function attachmentsRouter(store: Store) {
       next();
     },
     singleFileUpload('file', MAX_ATTACHMENT_BYTES),
-    (req, res) => {
-      const doc = load(req);
+    async (req, res) => {
+      const doc = await load(req);
       if (!req.file) throw new HttpError(400, 'missing_file', 'Choose a file to attach.');
 
       const filename = cleanFilename(originalName(req.file));
       const mimeType = checkAttachmentFile(filename, req.file.buffer);
-      if (store.countAttachments(doc.id) >= MAX_ATTACHMENTS_PER_DOCUMENT) {
+      const attachment = await store.createAttachment(
+        newAttachment(doc.id, req.user!.id, filename, mimeType, req.file.buffer),
+        MAX_ATTACHMENTS_PER_DOCUMENT,
+      );
+      if (!attachment) {
         throw new HttpError(
           409,
           'too_many_attachments',
           `A document can have up to ${MAX_ATTACHMENTS_PER_DOCUMENT} attachments. Remove one to add another.`,
         );
       }
-      const attachment = saveAttachment(store, doc.id, req.user!.id, filename, mimeType, req.file.buffer);
       res.status(201).json({ attachment });
     },
   );
 
-  router.get('/:attachmentId', (req, res) => {
-    const doc = load(req);
-    const meta = store.getAttachment(doc.id, String(req.params.attachmentId));
+  router.get('/:attachmentId', async (req, res) => {
+    const doc = await load(req);
+    const meta = await store.getAttachment(doc.id, String(req.params.attachmentId));
     if (!meta) throw notFound('Attachment');
 
     const etag = `"${meta.sha256}"`;
@@ -150,7 +161,7 @@ export function attachmentsRouter(store: Store) {
       return;
     }
 
-    const data = store.getAttachmentData(meta.id);
+    const data = await store.getAttachmentData(meta.id);
     if (!data) throw notFound('Attachment');
     const inline = req.query.inline === '1' && INLINE_MIME_TYPES.has(meta.mimeType);
     res.setHeader('Content-Type', meta.mimeType);
@@ -177,10 +188,10 @@ export function attachmentsRouter(store: Store) {
     res.end(bytes);
   });
 
-  router.delete('/:attachmentId', (req, res) => {
-    const doc = load(req);
+  router.delete('/:attachmentId', async (req, res) => {
+    const doc = await load(req);
     if (doc.role === 'viewer') throw forbidden('You have view-only access, so you can’t change attachments.');
-    if (!store.deleteAttachment(doc.id, String(req.params.attachmentId))) throw notFound('Attachment');
+    if (!(await store.deleteAttachment(doc.id, String(req.params.attachmentId)))) throw notFound('Attachment');
     res.status(204).end();
   });
 

@@ -5,8 +5,8 @@ A lightweight collaborative document editor: accounts, rich-text editing with au
 ## Try it
 
 - **Live app:** _URL added after deployment_
-  - Runs on Render's free plan. The first visit after a quiet spell takes 30–60 seconds while the server wakes up.
-  - Data resets when the server sleeps, so start a test session and finish it in one go. The demo accounts and sample documents are always there.
+  - Runs on Vercel, with the data in a Turso database, so accounts, documents and files you create stay between visits.
+  - The first request after a quiet spell can take a second or two while a server instance starts.
 - **Repository:** https://github.com/aimaster-dev/ajaia-docs
 - **Sign in:** use a demo account (**alice**, **bob** or **carol**, password `ajaia-demo`; the sign-in page has one-click buttons), or create your own on the *Create account* tab.
 - **Two-minute tour:** see [README → Two-minute tour](README.md#two-minute-tour-for-reviewers).
@@ -19,13 +19,13 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | Item | Where |
 | --- | --- |
 | Source code | `src/server` (Express API), `src/client` (React + TipTap), `src/shared` (types and rules used by both) |
-| Automated tests (55) | `tests/`: accounts, sharing and access control, attachments and embedding, import, database upgrades, autosave. Run with `npm test` |
+| Automated tests (58) | `tests/`: accounts, sharing and access control, attachments and embedding, import, database setup and upgrades, autosave. Run with `npm test` |
 | Setup and run instructions | [`README.md`](README.md) |
 | Architecture note | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | AI workflow note | [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md) |
 | Screenshots | [`docs/screenshots/`](docs/screenshots/) (6 PNGs, also shown below) |
 | Test files for manual testing | [`samples/`](samples/README.md): `import/` (5), `attach/` (11), `should-fail/` (10 committed, plus 2 large ones made by `npm run samples`) |
-| Deployment config | `Dockerfile`, `.dockerignore`, `render.yaml` (Render Blueprint: Docker, free plan, `/api/health` check), plus `railway.json` for Railway |
+| Deployment config | `vercel.json` and `api/index.js` (Vercel: static client plus one serverless function; data in Turso). Also a `Dockerfile` for any Docker host, with `render.yaml` and `railway.json` |
 | Project config | `package.json`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts`, `vitest.config.ts`, `index.html`, `public/favicon.svg`, `.gitignore` |
 | Sample generator | `scripts/make-samples.ts` (`npm run samples`) |
 
@@ -40,13 +40,13 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | --- | --- |
 | Create, rename, edit, save and reopen | New document, inline title rename, TipTap editor, debounced and version-checked autosave (plus Ctrl/Cmd+S); content survives refresh |
 | Rich text | Bold, italic, underline, strikethrough, H1–H3, bulleted and numbered lists, quotes, undo/redo, Markdown shortcuts |
-| File upload | **Import** `.txt`/`.md`/`.docx` (5 MB) as a new document, keeping Word pictures. **Attachments** (10 MB, 20 per document) placed *in the text*: inline images, audio players, and file chips for PDFs, Office files, video and ZIP. Allowed types are listed in the UI and README; disguised files are refused |
+| File upload | **Import** `.txt`/`.md`/`.docx` (4 MB) as a new document, keeping Word pictures. **Attachments** (4 MB, 20 per document) placed *in the text*: inline images, audio players, and file chips for PDFs, Office files, video and ZIP. Allowed types are listed in the UI and README; disguised files are refused |
 | Sharing | Owner plus per-user **viewer/editor** roles by username, enforced on the server; grant, change and revoke |
 | Owned vs shared | Separate "My documents" and "Shared with me" lists, with owner and role badges |
-| Persistence | SQLite (`node:sqlite`) with migrations; sanitized HTML; files stored with their document |
+| Persistence | SQLite through libSQL: a local file in development, Turso in production. Migrations; sanitized HTML; files stored with their document; multi-row writes in atomic batches |
 | Validation and error handling | zod validation with field-level messages, consistent JSON errors, upload type/content/size checks, rate limits |
-| Automated tests | 55 tests across 6 files (see above) |
-| Deployment | Render (Docker, from GitHub, via `render.yaml`) at the live URL above. The free plan resets data when idle; a paid plan with a disk at `/data` keeps it (see [README → Deploy](README.md#deploy-to-render)) |
+| Automated tests | 58 tests across 6 files (see above) |
+| Deployment | Vercel (from GitHub, via `vercel.json`) with a Turso database, at the live URL above. Steps in [README → Deploy](README.md#deploy-to-vercel-with-turso) |
 | Architecture note and AI note | `docs/ARCHITECTURE.md`, `docs/AI_WORKFLOW.md` |
 
 ## Screenshots
@@ -61,8 +61,8 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 
 - Not real-time co-editing: conflicts are detected (version check) and others' changes appear within about 4 seconds.
 - No password reset, since there's no email.
+- Files are capped at 4 MB, the most a Vercel function accepts per request.
 - Video is a download chip rather than an inline player.
-- A single instance, since SQLite lives on one volume.
-- On the free hosting plan the live demo's data resets when it sleeps. Locally, or with a persistent disk, everything persists.
+- Sign-in rate limits are kept in memory, so on Vercel each server instance counts separately.
 
 Details and next steps are in the [architecture note](docs/ARCHITECTURE.md#what-id-do-next).

@@ -2,7 +2,7 @@
 
 A lightweight collaborative document editor: create an account, create and format documents in the browser, import `.txt` / `.md` / `.docx` files, and share documents with other people as viewers or editors.
 
-**Live demo:** _URL added after deployment (see [Deploy](#deploy-to-render))_. Hosted on Render's free plan: the first visit after a quiet spell takes 30–60 seconds to wake the server, and data resets when it sleeps.
+**Live demo:** _URL added after deployment (see [Deploy](#deploy-to-vercel-with-turso))_. Hosted on Vercel, with the data in a Turso database, so everything you create stays.
 
 - [Submission summary](SUBMISSION.md): exactly what's included, and where each requirement is met
 - [Architecture note](docs/ARCHITECTURE.md): what I prioritized and why
@@ -43,14 +43,14 @@ Ready-made test files for every upload path live in [`samples/`](samples/README.
 | Requirement | Implementation |
 | --- | --- |
 | Accounts | Sign up, sign in and sign out with **username + password**. Change password (signs out other devices). Passwords hashed with scrypt; failed sign-ins rate limited; 7-day sessions in an `httpOnly` cookie |
-| Create / rename / edit / save / reopen | New document button, inline title rename, TipTap rich-text editor, debounced autosave (plus Ctrl/Cmd+S), documents persist in SQLite |
+| Create / rename / edit / save / reopen | New document button, inline title rename, TipTap rich-text editor, debounced autosave (plus Ctrl/Cmd+S), documents persist in the database |
 | Rich text | Bold, italic, underline, strikethrough, Normal/H1/H2/H3, bulleted and numbered lists, block quotes, undo/redo, clear formatting |
-| File upload: attachments | Files live *in the text* where they're relevant: inline images, audio players, and file chips for everything else (video, PDF, Office, ZIP). Paste, drop or toolbar insert, with an upload placeholder in place. Up to 10 MB each, 20 per document. An Attachments box indexes every file. Access follows the document's sharing (viewers view and download; owners and editors add, place and remove). Files whose contents don't match their extension are refused |
-| File upload: import | Import `.txt`, `.md`, `.docx` (max 5 MB) as a **new editable document**. Unsupported types are rejected with a clear message in the UI and API |
+| File upload: attachments | Files live *in the text* where they're relevant: inline images, audio players, and file chips for everything else (video, PDF, Office, ZIP). Paste, drop or toolbar insert, with an upload placeholder in place. Up to 4 MB each, 20 per document. An Attachments box indexes every file. Access follows the document's sharing (viewers view and download; owners and editors add, place and remove). Files whose contents don't match their extension are refused |
+| File upload: import | Import `.txt`, `.md`, `.docx` (max 4 MB) as a **new editable document**. Unsupported types are rejected with a clear message in the UI and API |
 | Sharing | Owner + per-user roles (**viewer** / **editor**), enforced on the server. Owners share **by username** (with suggestions as you type), change roles and revoke access; documents nobody shared with you return 404 |
 | Owned vs shared | Separate "My documents" / "Shared with me" sections with owner and role badges; role shown in the editor header |
-| Persistence | SQLite (Node's built-in `node:sqlite`), schema migrations, sanitized HTML content, WAL mode |
-| Quality | Input validation (zod) with field-level errors, consistent JSON errors, upload limits, HTML sanitization, CSP, 55 automated tests |
+| Persistence | SQLite through libSQL: a local file in development, a [Turso](https://turso.tech) database in production. Schema migrations, sanitized HTML content, multi-row writes in atomic batches |
+| Quality | Input validation (zod) with field-level errors, consistent JSON errors, upload limits, HTML sanitization, CSP, 58 automated tests |
 
 ### Attachments
 
@@ -83,7 +83,7 @@ H4 to H6 become H3 (the editor has three heading levels). Legacy `.doc`, PDF and
 
 ## Run locally
 
-Requires **Node.js 22.13+** (Node 24 LTS recommended). There's no database to install: SQLite is built into Node.
+Requires **Node.js 22.13+** (Node 24 LTS recommended). There's no database to install: locally the app keeps its data in a SQLite file, using libSQL's prebuilt driver (nothing to compile).
 
 ```bash
 npm install
@@ -112,34 +112,39 @@ Configuration (environment variables):
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PORT` | `3000` | HTTP port |
-| `DATABASE_PATH` | `data/ajaia-docs.db` | SQLite file location |
+| `DATABASE_PATH` | `data/ajaia-docs.db` | SQLite file location (when no Turso URL is set) |
+| `TURSO_DATABASE_URL` | none | A Turso database (`libsql://…`). When set, it's used instead of the local file |
+| `TURSO_AUTH_TOKEN` | none | The token for that database |
 | `DEMO_ACCOUNTS` | `true` | Create the shared demo accounts (alice, bob, carol) and show them on the sign-in page. Set to `false` for real use: their password is public |
 
-## Deploy to Render
+## Deploy to Vercel (with Turso)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/aimaster-dev/ajaia-docs)
+Vercel runs the API as a serverless function and serves the React app from its CDN. Serverless functions have no lasting disk, so the data lives in [Turso](https://turso.tech), a hosted SQLite database with a free plan. The app runs the same queries against a local file and against Turso.
 
-The repo includes a `Dockerfile` and a Render Blueprint, `render.yaml`. The Blueprint sets up a Docker web service on the free plan, with a health check on `/api/health`.
+**1. Create the database** (Turso, free):
+1. Sign up at [turso.tech](https://turso.tech) (GitHub sign-in works).
+2. In the dashboard, create a database (for example `ajaia-docs`) in a region near your Vercel region (Vercel defaults to Washington, D.C., `iad1`, so pick a US East region).
+3. On the database's page, copy its **URL** (`libsql://ajaia-docs-<you>.<region>.turso.io`) and create a **token** with read and write access. Keep both for step 2.
 
-1. Click the button above, or in the Render dashboard choose **New → Blueprint** and pick this repository.
-2. Click **Apply**. Render builds the Docker image, which takes a few minutes the first time.
-3. When the service shows **Live**, open its `onrender.com` URL and sign in as a demo account, or create one. Demo accounts and sample documents are created automatically on every start.
+The app creates its tables, demo accounts and sample documents on first start.
 
-No environment variables are required: the image sets `DATABASE_PATH=/data/ajaia-docs.db`, and Render supplies `PORT`.
+**2. Deploy** (Vercel, free Hobby plan):
+1. In Vercel, choose **Add New → Project** and import this GitHub repository. `vercel.json` already sets the build (`npm run build`), the output folder (`dist/client`) and the routes, so leave the build settings as they are.
+2. Under **Environment Variables**, add `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` with the values from step 1.
+3. Click **Deploy**. When it finishes, open the `*.vercel.app` URL and sign in as a demo account, or create one.
 
-**Free plan limits:**
-- The service sleeps after 15 minutes without traffic, and its disk is reset when it sleeps or restarts.
-- Anything people create is gone after that, but the demo data comes back.
+If you deployed before adding the variables, add them under **Settings → Environment Variables** and redeploy. Until then the API answers with a message saying what's missing.
 
-**To keep data:** switch the service to a paid plan and add a **disk** mounted at **`/data`** (the commented-out `disk` block in `render.yaml`). Attachments are stored in the database file, so size the disk for the files you expect.
+How it fits together:
+- `api/index.js` is the one serverless function. It loads the compiled Express app (`dist/server/vercel.js`) once per instance and passes each `/api/*` request to it.
+- `vercel.json` sends `/api/*` to that function, every other path to the React app, and sets the same security headers the Express server sets.
+- **Files are limited to 4 MB**, because a Vercel function accepts at most 4.5 MB per request and response.
 
-**Run it as a single instance,** since SQLite lives on one disk.
-
-**Other hosts:** any Docker host with a persistent volume at `/data` works the same way. `railway.json` is included for Railway, which was paused for new sign-ups when this was built.
+**Other hosts:** the `Dockerfile` runs the whole app as one Node server (`npm start`) anywhere Docker runs. Without a Turso URL it keeps a SQLite file at `/data/ajaia-docs.db`, so mount a persistent volume there. `render.yaml` (Render) and `railway.json` (Railway) are included for those hosts. On Render's free plan the disk resets when the service sleeps, unless `TURSO_DATABASE_URL` is set.
 
 ## Tests
 
-`npm test` runs 55 tests (about 10–20 seconds, mostly the large-upload tests):
+`npm test` runs 58 tests (a few seconds):
 
 - **Embedding tests** (`tests/embedding.test.ts`):
   - images, audio and file chips survive save → reopen
@@ -154,7 +159,7 @@ No environment variables are required: the image sets `DATABASE_PATH=/data/ajaia
   - permissions at every role (viewer read-only; no access = 404; ids can't be used across documents)
   - unsupported, disguised (`.exe` renamed to `.pdf`, HTML renamed to `.png`), empty and oversized files
   - images-only inline display
-  - the 20-file limit
+  - the 20-file limit, including several uploads racing for the last slot
   - files deleted along with their document
 - **Account tests** (`tests/auth.test.ts`):
   - sign-up stores only a salted hash
@@ -166,7 +171,11 @@ No environment variables are required: the image sets `DATABASE_PATH=/data/ajaia
   - changing the password needs the current one and revokes other sessions but not this one
   - demo passwords can't be changed
   - user search
-- **Upgrade tests** (`tests/migration.test.ts`): an email-era database is upgraded through every migration with every document, share and author intact, and foreign keys still enforced.
+- **Database tests** (`tests/migration.test.ts`):
+  - an email-era database is upgraded through every migration with every document, share and author intact, and foreign keys still enforced
+  - a brand-new database gets exactly the schema the migrations produce
+  - reopening and reseeding changes nothing
+  - a database from before the version table existed opens without redoing any step
 - **API integration tests** (`tests/api.test.ts`, Supertest against an in-memory database):
   - auth required
   - create → rename → save → reopen keeps formatting
@@ -190,7 +199,7 @@ The `.docx` fixtures are built in memory (`tests/helpers/docx.ts`), so there are
 src/
   server/          Express API
     app.ts         app factory (routes, security headers, error handling)
-    db.ts          Store: all SQL, migrations, access checks
+    db.ts          Store: all SQL, migrations, access checks (libSQL: local file or Turso)
     auth.ts        sign-up, sign-in, sign-out, change password, sessions
     password.ts    scrypt hashing and verification
     rateLimit.ts   in-memory limits for sign-in and sign-up attempts
@@ -199,7 +208,8 @@ src/
     uploads.ts     upload handling: size limits, safe filenames, content checks
     importFile.ts  .txt / .md / .docx → sanitized HTML
     sanitize.ts    HTML allowlist shared by saves and imports
-    index.ts       production entry (serves API + built client)
+    index.ts       production entry for Docker/`npm start` (serves API + built client)
+    vercel.ts      Vercel entry (API only; Vercel serves the client)
     dev.ts         dev entry (API + Vite middleware)
   client/          React app
     pages/         Sign in / create account, Documents, Editor
@@ -207,7 +217,8 @@ src/
     components/    Toolbar, AttachmentsPanel, ShareDialog, AccountDialog, form fields, header, toasts
     lib/           API client, autosave, form validation, tiny router
   shared/          types, account rules and attachment rules shared by client and server
-tests/             embedding, attachment, account, upgrade, API and autosave tests
+api/index.js       the Vercel serverless function (loads dist/server/vercel.js)
+tests/             embedding, attachment, account, database, API and autosave tests
 samples/           test files: import/, attach/, should-fail/ (guide in samples/README.md)
 docs/              architecture and AI workflow notes
 ```
@@ -217,10 +228,10 @@ docs/              architecture and AI workflow notes
 - **Not real-time co-editing.** Concurrent edits are detected (version check) rather than merged, and other people's changes show up by polling every 4 seconds. See the architecture note for the upgrade path (Yjs).
 - **No password reset.** There's no email, so a forgotten password can't be recovered by the user. An admin reset or email-based reset would be next.
 - **The demo accounts' password is public** by design. Turn them off with `DEMO_ACCOUNTS=false` for anything real.
-- **Rate limits live in memory**, so they reset on restart and wouldn't be shared across several instances.
+- **Rate limits live in memory.** On Vercel each function instance keeps its own count, and counts reset when an instance is recycled, so the sign-in limits are weaker there than on a single server. A shared store (Redis, or a table in the database) would fix that.
 - **Import creates a new document**; it doesn't merge into an existing one. Tables aren't imported (their text is).
-- **Video is a file chip, not an inline player.** At 10 MB a video is barely a minute, and large media should live in object storage rather than the database. With that in place, an inline player is a small change, since byte ranges already work.
+- **Files are capped at 4 MB,** because Vercel functions accept at most 4.5 MB per request. Larger files would upload straight to object storage (S3 or R2) through signed URLs, bypassing the function.
+- **Video is a file chip, not an inline player.** At 4 MB a video is only seconds long, and large media belongs in object storage rather than the database. With that in place, an inline player is a small change, since byte ranges already work.
 - **Images can't be resized or captioned** in the editor yet.
-- **Attachments live inside the SQLite file.** That's simple and safe at this scale (one backup covers everything, and nothing is left orphaned), but large volumes of files belong in object storage such as S3 or R2. Only the attachment methods in `Store` that read or write file bytes would change.
+- **Attachments live inside the database.** That's simple and safe at this scale (one backup covers everything, and nothing is left orphaned), but large volumes of files belong in object storage. Only the attachment methods in `Store` that read or write file bytes would change.
 - **No virus scanning** of attachments beyond the type and content checks.
-- **Single instance:** SQLite on one volume. Moving to Postgres is contained to `src/server/db.ts`.

@@ -49,9 +49,9 @@ export function createApp(store: Store, options: AppOptions = {}): Express {
     }),
   );
   // Share-dialog suggestions: ?q=<start of a username or name>
-  app.get('/api/users', requireUser, (req, res) => {
+  app.get('/api/users', requireUser, async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 64) : '';
-    res.json({ users: store.searchUsers(q, req.user!.id) });
+    res.json({ users: await store.searchUsers(q, req.user!.id) });
   });
   app.use('/api/documents', requireUser, documentsRouter(store));
   app.use('/api', () => {
@@ -71,7 +71,7 @@ export function createApp(store: Store, options: AppOptions = {}): Express {
       if (status === 429 && retryAfter) res.setHeader('Retry-After', String(retryAfter));
     } else if (err instanceof multer.MulterError) {
       status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
-      const message = err.code === 'LIMIT_FILE_SIZE' ? 'That file is larger than the 5 MB limit.' : err.message;
+      const message = err.code === 'LIMIT_FILE_SIZE' ? 'That file is too large.' : err.message;
       body = { error: { code: 'upload_error', message } };
     } else if (err?.type === 'entity.parse.failed') {
       status = 400;

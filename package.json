@@ -17,6 +17,7 @@
     "samples": "tsx scripts/make-samples.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "@tiptap/extensions": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",

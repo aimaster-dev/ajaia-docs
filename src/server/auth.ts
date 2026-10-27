@@ -45,10 +45,10 @@ function readCookie(req: Request, name: string): string | undefined {
 
 /** Resolves the session cookie (if any) to a user. Never rejects the request on its own. */
 export function attachUser(store: Store) {
-  return (req: Request, _res: Response, next: NextFunction) => {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     const token = readCookie(req, SESSION_COOKIE);
     if (token) {
-      const user = store.getSessionUser(token);
+      const user = await store.getSessionUser(token);
       if (user) {
         req.user = user;
         req.sessionToken = token;
@@ -128,8 +128,8 @@ export function authRouter(store: Store, options: AuthOptions) {
   const router = Router();
   const limiter = new RateLimiter();
 
-  const startSession = (req: Request, res: Response, userId: string) => {
-    const { token, expiresAt } = store.createSession(userId);
+  const startSession = async (req: Request, res: Response, userId: string) => {
+    const { token, expiresAt } = await store.createSession(userId);
     res.cookie(SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'lax',
@@ -147,7 +147,7 @@ export function authRouter(store: Store, options: AuthOptions) {
   router.post('/register', async (req, res) => {
     limiter.hit(`register:${req.ip}`, 10, 60 * MINUTE);
     const body = parseBody(RegisterBody, req.body);
-    if (store.getUserByUsername(body.username)) {
+    if (await store.getUserByUsername(body.username)) {
       throw new HttpError(409, 'username_taken', 'That username is taken. Try another one.', { field: 'username' });
     }
 
@@ -155,7 +155,7 @@ export function authRouter(store: Store, options: AuthOptions) {
     let user: User;
     try {
       const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)]!;
-      user = store.createUser({ username: body.username, name: body.name, color, passwordHash });
+      user = await store.createUser({ username: body.username, name: body.name, color, passwordHash });
     } catch (err) {
       // Someone registered the same name while we were hashing.
       if (err instanceof UsernameTakenError) {
@@ -163,8 +163,8 @@ export function authRouter(store: Store, options: AuthOptions) {
       }
       throw err;
     }
-    store.purgeExpiredSessions();
-    startSession(req, res, user.id);
+    await store.purgeExpiredSessions();
+    await startSession(req, res, user.id);
     res.status(201).json({ user });
   });
 
@@ -174,7 +174,7 @@ export function authRouter(store: Store, options: AuthOptions) {
     limiter.hit(`login-ip:${req.ip}`, 100, 15 * MINUTE); // spraying many usernames
     limiter.hit(accountKey, 5, 15 * MINUTE); // guessing one account's password
 
-    const creds = store.getCredentials(username);
+    const creds = await store.getCredentials(username);
     const ok = creds?.passwordHash
       ? await verifyPassword(password, creds.passwordHash)
       : await verifyAgainstDummy(password);
@@ -183,13 +183,13 @@ export function authRouter(store: Store, options: AuthOptions) {
     }
 
     limiter.reset(accountKey);
-    store.purgeExpiredSessions();
-    startSession(req, res, creds.user.id);
+    await store.purgeExpiredSessions();
+    await startSession(req, res, creds.user.id);
     res.json({ user: creds.user });
   });
 
-  router.post('/logout', (req, res) => {
-    if (req.sessionToken) store.deleteSession(req.sessionToken);
+  router.post('/logout', async (req, res) => {
+    if (req.sessionToken) await store.deleteSession(req.sessionToken);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
     res.status(204).end();
   });
@@ -206,7 +206,7 @@ export function authRouter(store: Store, options: AuthOptions) {
     const { currentPassword, newPassword } = parseBody(ChangePasswordBody, req.body);
     limiter.hit(`password:${user.id}`, 5, 15 * MINUTE);
 
-    const hash = store.getPasswordHash(user.id);
+    const hash = await store.getPasswordHash(user.id);
     if (!hash || !(await verifyPassword(currentPassword, hash))) {
       throw new HttpError(400, 'wrong_password', 'Your current password is incorrect.', { field: 'currentPassword' });
     }
@@ -214,9 +214,9 @@ export function authRouter(store: Store, options: AuthOptions) {
       throw new HttpError(400, 'validation_error', 'Password can’t be the same as your username.', { field: 'newPassword' });
     }
 
-    store.setPasswordHash(user.id, await hashPassword(newPassword));
+    await store.setPasswordHash(user.id, await hashPassword(newPassword));
     // Anyone holding an old session (e.g. a stolen cookie) is signed out; this device stays in.
-    store.deleteSessionsForUser(user.id, req.sessionToken);
+    await store.deleteSessionsForUser(user.id, req.sessionToken);
     limiter.reset(`password:${user.id}`);
     res.status(204).end();
   });

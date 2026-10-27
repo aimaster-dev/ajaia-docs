@@ -5,8 +5,8 @@ import type { Express } from 'express';
 import { createApp } from '../src/server/app.js';
 import { Store } from '../src/server/db.js';
 import { DEMO_PASSWORD, seedDemoAccounts } from '../src/server/seed.js';
-import { MAX_ATTACHMENTS_PER_DOCUMENT } from '../src/shared/attachments.js';
-import type { Attachment, DocumentDetail, DocumentListResponse } from '../src/shared/types.js';
+import { MAX_ATTACHMENTS_PER_DOCUMENT, MAX_ATTACHMENT_BYTES } from '../src/shared/attachments.js';
+import { MAX_IMPORT_BYTES, type Attachment, type DocumentDetail, type DocumentListResponse } from '../src/shared/types.js';
 import { makeDocx } from './helpers/docx.js';
 
 // Small but genuine files of each family.
@@ -43,7 +43,7 @@ const attach = (agent: request.Agent, data: Buffer, filename: string) =>
   agent.post(base()).attach('file', data, filename);
 
 beforeEach(async () => {
-  store = new Store(':memory:');
+  store = await Store.open({ url: ':memory:' });
   await seedDemoAccounts(store);
   app = createApp(store);
   [alice, bob, carol] = await Promise.all(['alice', 'bob', 'carol'].map(signIn)) as [request.Agent, request.Agent, request.Agent];
@@ -124,8 +124,8 @@ describe('attachments', () => {
     await attach(alice, Buffer.from([0x68, 0x00, 0x69]), 'notes.txt').expect(422); // binary posing as text
 
     await attach(alice, Buffer.alloc(0), 'empty.pdf').expect(400);
-    const big = await attach(alice, Buffer.concat([PDF, Buffer.alloc(10 * 1024 * 1024)]), 'huge.pdf').expect(413);
-    expect(big.body.error.message).toBe('That file is larger than the 10 MB limit.');
+    const big = await attach(alice, Buffer.concat([PDF, Buffer.alloc(MAX_ATTACHMENT_BYTES)]), 'huge.pdf').expect(413);
+    expect(big.body.error.message).toBe('That file is larger than the 4 MB limit.');
     await alice.post(base()).expect(400); // no file at all
 
     expect((await alice.get(base()).expect(200)).body.attachments).toEqual([]);
@@ -150,6 +150,14 @@ describe('attachments', () => {
     expect(res.body.error.code).toBe('too_many_attachments');
   });
 
+  it('keeps the limit when several uploads arrive at once', async () => {
+    for (let i = 0; i < MAX_ATTACHMENTS_PER_DOCUMENT - 1; i++) await attach(alice, PDF, `file-${i}.pdf`).expect(201);
+    // One slot left, three uploads racing for it: exactly one wins.
+    const results = await Promise.all([alice, bob, alice].map((agent, i) => attach(agent, PDF, `race-${i}.pdf`)));
+    expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
+    expect(await store.countAttachments(doc.id)).toBe(MAX_ATTACHMENTS_PER_DOCUMENT);
+  });
+
   it('shows attachment counts in document lists and deletes files along with their document', async () => {
     await attach(alice, PDF, 'a.pdf').expect(201);
     await attach(bob, PNG, 'b.png').expect(201);
@@ -159,16 +167,16 @@ describe('attachments', () => {
     expect((await alice.get(`/api/documents/${doc.id}`).expect(200)).body.attachmentCount).toBe(2);
 
     await alice.delete(`/api/documents/${doc.id}`).expect(204);
-    const left = (t: string) => Number((store.db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n);
-    expect(left('attachments')).toBe(0);
-    expect(left('attachment_blobs')).toBe(0); // no orphaned file contents
+    const left = async (t: string) => Number((await store.client.execute(`SELECT COUNT(*) AS n FROM ${t}`)).rows[0]!.n);
+    expect(await left('attachments')).toBe(0);
+    expect(await left('attachment_blobs')).toBe(0); // no orphaned file contents
   });
 
-  it('keeps the import size limit message accurate (separate 5 MB limit)', { timeout: 20_000 }, async () => {
+  it('keeps the import size limit message accurate (its own limit)', { timeout: 20_000 }, async () => {
     const res = await alice
       .post('/api/documents/import')
-      .attach('file', Buffer.alloc(6 * 1024 * 1024, 'a'), 'huge.txt')
+      .attach('file', Buffer.alloc(MAX_IMPORT_BYTES + 1, 'a'), 'huge.txt')
       .expect(413);
-    expect(res.body.error.message).toBe('That file is larger than the 5 MB limit.');
+    expect(res.body.error.message).toBe('That file is larger than the 4 MB limit.');
   });
 });

@@ -11,7 +11,7 @@ let app: Express;
 let store: Store;
 
 beforeEach(async () => {
-  store = new Store(':memory:');
+  store = await Store.open({ url: ':memory:' });
   await seedDemoAccounts(store);
   app = createApp(store, { demoAccounts: true });
 });
@@ -42,7 +42,7 @@ describe('sign-up', () => {
     const me = await agent.get('/api/auth/me').expect(200);
     expect(me.body.user.username).toBe('dana');
 
-    const hash = store.getPasswordHash(res.body.user.id)!;
+    const hash = (await store.getPasswordHash(res.body.user.id))!;
     expect(hash).toMatch(/^scrypt\$16384\$8\$1\$/);
     expect(hash).not.toContain(DANA.password);
 
@@ -53,7 +53,7 @@ describe('sign-up', () => {
   it('gives two accounts with the same password different hashes', async () => {
     const a = await register(request(app), { ...DANA, username: 'dana' }).expect(201);
     const b = await register(request(app), { ...DANA, username: 'dana2' }).expect(201);
-    expect(store.getPasswordHash(a.body.user.id)).not.toBe(store.getPasswordHash(b.body.user.id));
+    expect(await store.getPasswordHash(a.body.user.id)).not.toBe(await store.getPasswordHash(b.body.user.id));
   });
 
   it('rejects usernames that are taken, ignoring case', async () => {
@@ -120,9 +120,9 @@ describe('sign-in', () => {
   it('rejects made-up and expired session tokens', async () => {
     await request(app).get('/api/documents').set('Cookie', `${SESSION_COOKIE}=deadbeef`).expect(401);
 
-    const alice = store.getUserByUsername('alice')!;
-    const { token } = store.createSession(alice.id);
-    store.db.prepare('UPDATE sessions SET expires_at = ? WHERE token = ?').run('2000-01-01T00:00:00.000Z', token);
+    const alice = (await store.getUserByUsername('alice'))!;
+    const { token } = await store.createSession(alice.id);
+    await store.client.execute({ sql: 'UPDATE sessions SET expires_at = ? WHERE token = ?', args: ['2000-01-01T00:00:00.000Z', token] });
     await request(app).get('/api/documents').set('Cookie', `${SESSION_COOKIE}=${token}`).expect(401);
   });
 });
@@ -195,7 +195,7 @@ describe('sign-in page config', () => {
     const on = await request(app).get('/api/auth/config').expect(200);
     expect(on.body.demo).toEqual({ usernames: ['alice', 'bob', 'carol'], password: DEMO_PASSWORD });
 
-    const off = await request(createApp(new Store(':memory:'))).get('/api/auth/config').expect(200);
+    const off = await request(createApp(await Store.open({ url: ':memory:' }))).get('/api/auth/config').expect(200);
     expect(off.body.demo).toBeNull();
   });
 });

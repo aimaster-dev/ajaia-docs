@@ -53,12 +53,12 @@ Things to try with them:
 | `corrupt.docx` | attachment / import | Not a real Word file | **Server** |
 | `binary-notes.txt` | attachment / import | Binary data posing as text | **Server** |
 | `empty.txt` | attachment / import | The file is empty | Browser |
-| `too-big-attachment.pdf` | attachment | 10.5 MB, over the 10 MB limit | Browser (server too) |
-| `too-big-import.txt` | import | 6 MB, over the 5 MB import limit | Browser (server too) |
+| `too-big-attachment.pdf` | attachment | 4.5 MB, over the 4 MB limit | Browser (server too) |
+| `too-big-import.txt` | import | 4.5 MB, over the 4 MB import limit | Browser (server too) |
 | `invoice.pdf` | import | PDF isn't an import format (attach it instead) | Browser |
 
 The two `too-big-*` files are generated but not committed (see `.gitignore`). Run `npm run samples` to create them.
 
 ## Not included
 
-Real MP3/M4A/OGG audio, WebP images and MP4/WebM/MOV video need an encoder to create, so they aren't generated here. Any short file from your phone (under 10 MB) works the same. Audio gets a player; video becomes a file chip.
+Real MP3/M4A/OGG audio, WebP images and MP4/WebM/MOV video need an encoder to create, so they aren't generated here. Any short file from your phone (under 4 MB) works the same. Audio gets a player; video becomes a file chip.

@@ -52,7 +52,7 @@ const embed = {
 };
 
 beforeEach(async () => {
-  const store = new Store(':memory:');
+  const store = await Store.open({ url: ':memory:' });
   await seedDemoAccounts(store);
   app = createApp(store);
   alice = await signIn('alice');

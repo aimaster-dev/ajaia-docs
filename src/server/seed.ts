@@ -49,25 +49,29 @@ let demoHash: Promise<string> | undefined;
  * Makes sure the demo accounts exist and can sign in:
  * - creates any that are missing (sample documents only on a brand-new database),
  * - gives a password to demo users carried over from before passwords existed.
- * Accounts that already have a password are never touched.
+ * Accounts that already have a password are never touched. Safe to run on
+ * every start, including from several servers at once.
  */
 export async function seedDemoAccounts(store: Store) {
-  const fresh = store.countUsers() === 0;
+  const fresh = (await store.countUsers()) === 0;
   demoHash ??= hashPassword(DEMO_PASSWORD); // one hash shared by all demo accounts
   const passwordHash = await demoHash;
+  const [alice, bob, carol] = SEED_USERS;
 
-  store.transaction(() => {
-    for (const u of SEED_USERS) {
-      const existing = store.getUserByUsername(u.username);
-      if (!existing) store.createUser({ ...u, passwordHash });
-      else if (existing.id === u.id && !store.getPasswordHash(existing.id)) store.setPasswordHash(existing.id, passwordHash);
-    }
-    if (fresh) {
-      const [alice, bob, carol] = SEED_USERS;
-      const plan = store.createDocument(alice.id, 'Q4 Launch Plan', WELCOME_HTML);
-      store.upsertShare(plan.id, bob.id, 'editor');
-      store.upsertShare(plan.id, carol.id, 'viewer');
-      store.createDocument(bob.id, 'Customer interview notes', BOB_HTML);
-    }
+  await store.ensureDemoData({
+    users: SEED_USERS.map((u) => ({ ...u, passwordHash })),
+    // Fixed ids, so two servers seeding at once create each document only once.
+    documents: fresh
+      ? [
+          { id: 'doc_demo_plan', ownerId: alice.id, title: 'Q4 Launch Plan', contentHtml: WELCOME_HTML },
+          { id: 'doc_demo_interviews', ownerId: bob.id, title: 'Customer interview notes', contentHtml: BOB_HTML },
+        ]
+      : [],
+    shares: fresh
+      ? [
+          { documentId: 'doc_demo_plan', userId: bob.id, role: 'editor' },
+          { documentId: 'doc_demo_plan', userId: carol.id, role: 'viewer' },
+        ]
+      : [],
   });
 }

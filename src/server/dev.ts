@@ -2,11 +2,12 @@
 // (with hot reload) behind the same Express app the API uses.
 import { createServer as createViteServer } from 'vite';
 import { createApp } from './app.js';
-import { config } from './config.js';
+import { config, describeDatabase } from './config.js';
 import { Store } from './db.js';
 import { seedDemoAccounts } from './seed.js';
 
-const store = new Store(config.databasePath);
+const database = config.database;
+const store = await Store.open(database);
 if (config.demoAccounts) await seedDemoAccounts(store);
 
 const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
@@ -16,5 +17,5 @@ const app = createApp(store, {
 });
 
 app.listen(config.port, () => {
-  console.log(`Ajaia Docs (dev) on http://localhost:${config.port} (db: ${config.databasePath})`);
+  console.log(`Ajaia Docs (dev) on http://localhost:${config.port} (db: ${describeDatabase(database)})`);
 });

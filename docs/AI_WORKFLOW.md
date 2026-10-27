@@ -7,7 +7,7 @@
 
 ## Decisions I made (not the AI)
 
-- **Hosting:** I first chose Railway with a persistent volume. Railway paused new sign-ups after a security incident, so the live demo runs on Render's free plan. I accepted that its data resets when idle, and documented how to keep it with a paid disk.
+- **Hosting:** I first chose Railway with a persistent volume, but Railway had paused new sign-ups. Render's free plan wipes its disk whenever the service sleeps. So the live demo runs on Vercel with a Turso database: free, persistent and always awake. The cost was moving the data layer from `node:sqlite` to libSQL (every query became async) and capping files at 4 MB to fit Vercel's request limit.
 - **Accounts:** real sign-in with username + password instead of email. Sharing needs an identity, and email would add infrastructure for little gain. I stopped an email-based draft in favor of this.
 - **Files:** attachments first, then placing files *inside* the document layout (images inline, audio players, file chips) rather than only a list under the page, and keeping video as a link until storage moves out of the database.
 - **Where to stop:** no real-time co-editing, password reset or inline video within the timebox.
@@ -31,10 +31,11 @@ Verification caught several problems in the generated code:
 | Opening the share or account dialog put focus on its Close button: React's `autoFocus` ran before `showModal()`, which then moved focus itself | Browser testing (typing went nowhere) | Focus the input explicitly after the dialog opens |
 | A style meant for the username in the account dialog also hit the avatar, washing out its initials | Screenshot review | Scoped the selector |
 | The attachment upload response leaked the file's internal SHA-256 hash (used only for caching headers) | Reading the raw API response during browser testing | Stripped from responses, with a test asserting it's absent |
-| `.docx` pictures were silently dropped on import: saving each picture opened a database transaction inside the import's transaction, SQLite refused, and a catch-all treated the error as "unsupported picture" | A new test expecting the imported picture | Nested transactions now use savepoints, and only rule violations (not real errors) skip a picture |
+| `.docx` pictures were silently dropped on import: saving each picture opened a database transaction inside the import's transaction, SQLite refused, and a catch-all treated the error as "unsupported picture" | A new test expecting the imported picture | Only rule violations (not real errors) skip a picture. The import is now one atomic batch, so there's no nested transaction at all |
 | Dropping an audio file and a video together lost the video's spot: inserting the player split the paragraph, and the editor discarded the placeholder sitting on the split | Browser test of a multi-file drop | Placeholder positions are tracked and mapped by hand, and files in one drop are placed one after another |
 | Clicking *Insert* in the Attachments box replaced whatever was selected, deleting an image that happened to be selected | Browser test (the image vanished) | Inserting always goes after the selection and never replaces it |
-| A combined rename + content save could half-apply if the content save hit a conflict | Review | The update runs in one transaction |
+| A combined rename + content save could half-apply if the content save hit a conflict | Review | The title and content are saved by one version-checked statement |
+| Moving to an async database made the 20-file limit racy: the count was checked, then the file inserted, and two uploads could both pass the check | Review during the libSQL conversion | The count is checked inside the insert itself, with a test racing three uploads for the last slot |
 | Clicking a page's margin didn't put the cursor in the document | Browser testing | Margin clicks focus the editor |
 | One 656 KB JS bundle | Build output | The editor is lazy-loaded; the first page is now 75 KB gzipped |
 
@@ -42,7 +43,9 @@ Approaches considered and rejected:
 
 - **Real-time co-editing (Yjs/CRDT):** the right long-term answer, but a WebSocket server and CRDT persistence don't fit the timebox. Optimistic concurrency plus polling covers the "don't lose work" requirement honestly.
 - **`react-router`:** two routes don't justify a dependency, so there's a 20-line router instead.
-- **`better-sqlite3`:** needs a native build. Node's built-in `node:sqlite` removes a setup failure point for reviewers.
+- **`better-sqlite3`:** needs a native build. The app first used Node's built-in `node:sqlite`, then libSQL (prebuilt binaries, and the same SQL locally and on Turso) once hosting moved to serverless.
+- **Postgres (Neon, Supabase) for production:** would have meant rewriting every query and migration in another dialect. Turso keeps SQLite, so the local and hosted databases behave the same.
+- **Vercel Blob for files:** would lift the 4 MB cap, but adds a second store, signed upload URLs and cleanup across both. Out of scope for the timebox; it's in the architecture note's next steps.
 - **Storing ProseMirror JSON:** HTML fits import/export better. The reasoning is in the architecture note.
 - **Email-based accounts** (verification links, password reset, invites by email): an AI draft of this was started. It was cut back to username + password, which is all sharing needs, and kept only its scrypt hashing and rate limiter. Email would add a sending provider, deliverability and more flows to secure, for little gain here.
 - **bcrypt or argon2:** both need native add-ons. scrypt is built into Node and is also memory-hard.
@@ -50,11 +53,12 @@ Approaches considered and rejected:
 ## How correctness, UX and reliability were verified
 
 - **Types:** strict TypeScript (including `noUncheckedIndexedAccess`) across server, client and tests.
-- **Automated tests (55):**
+- **Automated tests (58):**
   - files embedded in the text: round-trips, stripping of hostile or foreign embeds, byte ranges, `.docx` pictures
   - attachments: exact-byte downloads, safe headers, permissions at every role, disguised and oversized files, cleanup on delete
   - sign-up, sign-in, lockout, session revocation and password change
   - upgrading an existing database to accounts without losing data (also rehearsed on a copy of the real local database before the app touched it)
+  - a new database getting exactly the schema the migrations produce
   - access control at each role
   - XSS stripping
   - version conflicts
@@ -77,4 +81,8 @@ Approaches considered and rejected:
   - background tabs pause `requestAnimationFrame`, so focus changes are delayed
 
   These were confirmed by inspecting the DOM directly before deciding whether to change code.
-- **Not verified locally:** the Docker image build (no Docker on the build machine). Render's first build is that check.
+- **The Vercel function, run locally.** The built `api/index.js` was run behind a plain Node HTTP server against a throwaway database: 19 checks, including the "database not configured" message, sign-in, a combined rename + save, a stale save, uploads and byte-exact downloads up to 3.98 MB, a refused 4 MB+ file and a `.docx` import with its picture. A copy of the real local database was also opened with the new driver to confirm nothing was lost.
+- **Not verified locally:**
+  - the Turso connection itself (HTTPS rather than a local file; same queries), and Vercel's build and routing. The first deploy checks both.
+  - the Docker image build (no Docker on the build machine).
+- **A test-only quirk:** after the switch to libSQL, tests couldn't delete their temporary database folders on Windows, because a closed database keeps its file open until garbage collection. The tests now collect garbage before cleaning up. It doesn't affect the app.

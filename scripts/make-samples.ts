@@ -284,8 +284,8 @@ write(`${FAIL}/binary-notes.txt`, Buffer.from('hello\u0000world\u0000\u0001\u000
 write(`${FAIL}/empty.txt`, '');
 
 // Large files are generated but git-ignored (see .gitignore), to keep the repo small.
-const pdfHeader = makePdf([{ text: 'Padded to exceed the 10 MB limit', size: 14, y: 700 }]);
-write(`${FAIL}/too-big-attachment.pdf`, Buffer.concat([pdfHeader, Buffer.alloc(Math.round(10.5 * 1024 * 1024), 0x20)]));
-write(`${FAIL}/too-big-import.txt`, 'This file is over the 5 MB import limit.\n'.repeat(Math.ceil((6 * 1024 * 1024) / 42)));
+const pdfHeader = makePdf([{ text: 'Padded to exceed the 4 MB limit', size: 14, y: 700 }]);
+write(`${FAIL}/too-big-attachment.pdf`, Buffer.concat([pdfHeader, Buffer.alloc(Math.round(4.5 * 1024 * 1024), 0x20)]));
+write(`${FAIL}/too-big-import.txt`, 'This file is over the 4 MB import limit.\n'.repeat(Math.ceil((4.5 * 1024 * 1024) / 42)));
 
 console.log(`Wrote ${written.length} files:\n${written.map((p) => `  ${p}`).join('\n')}`);
