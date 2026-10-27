@@ -7,7 +7,7 @@
 
 ## Decisions I made (not the AI)
 
-- **Hosting:** Railway with a persistent volume, rather than a free tier whose disk is wiped on restart.
+- **Hosting:** I first chose Railway with a persistent volume. Railway paused new sign-ups after a security incident, so the live demo runs on Render's free plan. I accepted that its data resets when idle, and documented how to keep it with a paid disk.
 - **Accounts:** real sign-in with username + password instead of email. Sharing needs an identity, and email would add infrastructure for little gain. I stopped an email-based draft in favor of this.
 - **Files:** attachments first, then placing files *inside* the document layout (images inline, audio players, file chips) rather than only a list under the page, and keeping video as a link until storage moves out of the database.
 - **Where to stop:** no real-time co-editing, password reset or inline video within the timebox.
@@ -77,4 +77,4 @@ Approaches considered and rejected:
   - background tabs pause `requestAnimationFrame`, so focus changes are delayed
 
   These were confirmed by inspecting the DOM directly before deciding whether to change code.
-- **Not verified locally:** the Docker image build and the Railway deployment itself (no Docker on the build machine). Both need a check after the first deploy.
+- **Not verified locally:** the Docker image build (no Docker on the build machine). Render's first build is that check.

@@ -1,0 +1,21 @@
+# Render Blueprint: one-click deploy of the Docker image on Render's free plan.
+# https://render.com/docs/blueprint-spec
+#
+# Free plan: the service sleeps after 15 minutes without traffic, and its disk
+# is reset when it restarts or sleeps. The demo accounts (alice, bob, carol;
+# password "ajaia-demo") and sample documents are recreated on every start.
+# For data that persists, switch to a paid plan and uncomment the disk below.
+services:
+  - type: web
+    name: ajaia-docs
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: DEMO_ACCOUNTS
+        value: "true"
+    # disk:
+    #   name: data
+    #   mountPath: /data
+    #   sizeGB: 1

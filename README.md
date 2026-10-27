@@ -2,7 +2,7 @@
 
 A lightweight collaborative document editor: create an account, create and format documents in the browser, import `.txt` / `.md` / `.docx` files, and share documents with other people as viewers or editors.
 
-**Live demo:** _add the Railway URL here after deploying (see [Deploy](#deploy-to-railway))_
+**Live demo:** _URL added after deployment (see [Deploy](#deploy-to-render))_. Hosted on Render's free plan: the first visit after a quiet spell takes 30–60 seconds to wake the server, and data resets when it sleeps.
 
 - [Submission summary](SUBMISSION.md): exactly what's included, and where each requirement is met
 - [Architecture note](docs/ARCHITECTURE.md): what I prioritized and why
@@ -115,18 +115,27 @@ Configuration (environment variables):
 | `DATABASE_PATH` | `data/ajaia-docs.db` | SQLite file location |
 | `DEMO_ACCOUNTS` | `true` | Create the shared demo accounts (alice, bob, carol) and show them on the sign-in page. Set to `false` for real use: their password is public |
 
-## Deploy to Railway
+## Deploy to Render
 
-The repo includes a `Dockerfile` and `railway.json` (Docker build, health check on `/api/health`).
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/aimaster-dev/ajaia-docs)
 
-1. Push this repo to GitHub, then in Railway: **New Project → Deploy from GitHub repo**.
-2. Add a **Volume** to the service with mount path **`/data`**. Without it, documents and attachments are lost on every redeploy, because the container's own disk is temporary. Attachments are stored in the database file on this volume, so size it for the files you expect (for example 5 GB).
-3. Under **Settings → Networking**, click **Generate Domain**.
-4. Open the URL and sign in as a demo account, or create one. The demo accounts are seeded automatically on first boot.
+The repo includes a `Dockerfile` and a Render Blueprint, `render.yaml`. The Blueprint sets up a Docker web service on the free plan, with a health check on `/api/health`.
 
-No environment variables are required: the image sets `PORT=8080` and `DATABASE_PATH=/data/ajaia-docs.db`. Run it as a **single instance**, since SQLite lives on one volume.
+1. Click the button above, or in the Render dashboard choose **New → Blueprint** and pick this repository.
+2. Click **Apply**. Render builds the Docker image, which takes a few minutes the first time.
+3. When the service shows **Live**, open its `onrender.com` URL and sign in as a demo account, or create one. Demo accounts and sample documents are created automatically on every start.
 
-With the [Railway CLI](https://docs.railway.com/guides/cli) instead: `railway login`, `railway init`, `railway up`, then add the volume and domain in the dashboard as above.
+No environment variables are required: the image sets `DATABASE_PATH=/data/ajaia-docs.db`, and Render supplies `PORT`.
+
+**Free plan limits:**
+- The service sleeps after 15 minutes without traffic, and its disk is reset when it sleeps or restarts.
+- Anything people create is gone after that, but the demo data comes back.
+
+**To keep data:** switch the service to a paid plan and add a **disk** mounted at **`/data`** (the commented-out `disk` block in `render.yaml`). Attachments are stored in the database file, so size the disk for the files you expect.
+
+**Run it as a single instance,** since SQLite lives on one disk.
+
+**Other hosts:** any Docker host with a persistent volume at `/data` works the same way. `railway.json` is included for Railway, which was paused for new sign-ups when this was built.
 
 ## Tests
 

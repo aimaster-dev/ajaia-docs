@@ -19,7 +19,7 @@ export interface AppOptions {
 export function createApp(store: Store, options: AppOptions = {}): Express {
   const app = express();
   app.disable('x-powered-by');
-  // Behind Railway's proxy: trust X-Forwarded-Proto so secure cookies work.
+  // Behind the hosting provider's proxy: trust X-Forwarded-Proto so secure cookies work.
   app.set('trust proxy', 1);
 
   app.use((_req, res, next) => {

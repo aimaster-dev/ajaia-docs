@@ -28,7 +28,7 @@ Express app (one process)
    ▼
 Store (src/server/db.ts): the only module that runs SQL
    ▼
-SQLite (WAL) on a Railway volume at /data
+SQLite (WAL) at /data (a persistent disk where the host provides one)
 ```
 
 ```

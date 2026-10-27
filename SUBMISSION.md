@@ -5,6 +5,9 @@ A lightweight collaborative document editor: accounts, rich-text editing with au
 ## Try it
 
 - **Live app:** _URL added after deployment_
+  - Runs on Render's free plan. The first visit after a quiet spell takes 30–60 seconds while the server wakes up.
+  - Data resets when the server sleeps, so start a test session and finish it in one go. The demo accounts and sample documents are always there.
+- **Repository:** https://github.com/aimaster-dev/ajaia-docs
 - **Sign in:** use a demo account (**alice**, **bob** or **carol**, password `ajaia-demo`; the sign-in page has one-click buttons), or create your own on the *Create account* tab.
 - **Two-minute tour:** see [README → Two-minute tour](README.md#two-minute-tour-for-reviewers).
 - **Test files:** [`samples/`](samples/README.md) has files that should import, attach, or be refused, with what to expect for each.
@@ -22,7 +25,7 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | AI workflow note | [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md) |
 | Screenshots | [`docs/screenshots/`](docs/screenshots/) (6 PNGs, also shown below) |
 | Test files for manual testing | [`samples/`](samples/README.md): `import/` (5), `attach/` (11), `should-fail/` (10 committed, plus 2 large ones made by `npm run samples`) |
-| Deployment config | `Dockerfile`, `.dockerignore`, `railway.json` (Docker build, `/api/health` check, volume at `/data`) |
+| Deployment config | `Dockerfile`, `.dockerignore`, `render.yaml` (Render Blueprint: Docker, free plan, `/api/health` check), plus `railway.json` for Railway |
 | Project config | `package.json`, `package-lock.json`, `tsconfig*.json`, `vite.config.ts`, `vitest.config.ts`, `index.html`, `public/favicon.svg`, `.gitignore` |
 | Sample generator | `scripts/make-samples.ts` (`npm run samples`) |
 
@@ -43,7 +46,7 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | Persistence | SQLite (`node:sqlite`) with migrations; sanitized HTML; files stored with their document |
 | Validation and error handling | zod validation with field-level messages, consistent JSON errors, upload type/content/size checks, rate limits |
 | Automated tests | 55 tests across 6 files (see above) |
-| Deployment | Railway, Docker, persistent volume (see the live URL above) |
+| Deployment | Render (Docker, from GitHub, via `render.yaml`) at the live URL above. The free plan resets data when idle; a paid plan with a disk at `/data` keeps it (see [README → Deploy](README.md#deploy-to-render)) |
 | Architecture note and AI note | `docs/ARCHITECTURE.md`, `docs/AI_WORKFLOW.md` |
 
 ## Screenshots
@@ -60,5 +63,6 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 - No password reset, since there's no email.
 - Video is a download chip rather than an inline player.
 - A single instance, since SQLite lives on one volume.
+- On the free hosting plan the live demo's data resets when it sleeps. Locally, or with a persistent disk, everything persists.
 
 Details and next steps are in the [architecture note](docs/ARCHITECTURE.md#what-id-do-next).
