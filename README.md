@@ -2,7 +2,7 @@
 
 A lightweight collaborative document editor: create an account, create and format documents in the browser, import `.txt` / `.md` / `.docx` files, and share documents with other people as viewers or editors.
 
-**Live demo:** _URL added after deployment (see [Deploy](#deploy-to-vercel-with-turso))_. Hosted on Vercel, with the data in a Turso database, so everything you create stays.
+**Live demo:** **https://ajaia-docs-j51s.vercel.app**. Hosted on Vercel, with the data in a Turso database, so everything you create stays (see [Deploy](#deploy-to-vercel-with-turso)).
 
 - [Submission summary](SUBMISSION.md): exactly what's included, and where each requirement is met
 - [Architecture note](docs/ARCHITECTURE.md): what I prioritized and why

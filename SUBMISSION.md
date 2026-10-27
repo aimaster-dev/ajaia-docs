@@ -4,7 +4,7 @@ A lightweight collaborative document editor: accounts, rich-text editing with au
 
 ## Try it
 
-- **Live app:** _URL added after deployment_
+- **Live app:** **https://ajaia-docs-j51s.vercel.app**
   - Runs on Vercel, with the data in a Turso database, so accounts, documents and files you create stay between visits.
   - The first request after a quiet spell can take a second or two while a server instance starts.
 - **Repository:** https://github.com/aimaster-dev/ajaia-docs
