@@ -23,6 +23,7 @@ No extra setup is needed to try the live app. To run it locally: `npm install`, 
 | Setup and run instructions | [`README.md`](README.md) |
 | Architecture note | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | AI workflow note | [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md) |
+| All notes in one folder | `docs/` also holds copies of this file and the README, so every note is in one place |
 | Screenshots | [`docs/screenshots/`](docs/screenshots/) (6 PNGs, also shown below) |
 | Test files for manual testing | [`samples/`](samples/README.md): `import/` (5), `attach/` (11), `should-fail/` (10 committed, plus 2 large ones made by `npm run samples`) |
 | Deployment config | `vercel.json`, `api/index.js` and `scripts/build-vercel.mjs` (Vercel: static client plus one bundled serverless function; data in Turso). Also a `Dockerfile` for any Docker host, with `render.yaml` and `railway.json` |
