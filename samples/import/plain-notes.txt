@@ -1,0 +1,6 @@
+Quick notes from the customer call
+
+They want to paste in docs from Word and keep headings.
+Sharing should be simple: one person owns it, others can view or edit.
+
+Follow up next Tuesday.

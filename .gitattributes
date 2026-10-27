@@ -1,0 +1,16 @@
+# Source files use LF everywhere (the Docker build runs on Linux).
+* text=auto eol=lf
+
+# Test files must stay byte-for-byte identical: several are deliberately
+# disguised or malformed, and the PDF's internal offsets break if line endings change.
+samples/** -text
+
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.zip binary
+*.wav binary

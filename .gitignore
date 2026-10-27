@@ -1,0 +1,10 @@
+node_modules/
+dist/
+data/
+*.db
+*.db-shm
+*.db-wal
+.env
+.DS_Store
+.claude/
+samples/should-fail/too-big-*
